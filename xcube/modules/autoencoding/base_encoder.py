@@ -58,7 +58,7 @@ class Encoder(nn.Module):
             ref_grid = batch['input_grid']
             ref_xyz = ref_grid.grid_to_world(ref_grid.ijk.float()) 
             # splatting normal
-            input_normal = grid.splat_trilinear(ref_xyz, fvdb.JaggedTensor(input_normal))
+            input_normal = grid.splat_trilinear(ref_xyz, input_normal)
             # normalize normal
             input_normal.jdata /= (input_normal.jdata.norm(dim=1, keepdim=True) + 1e-6)
             unet_feat = torch.cat([unet_feat, input_normal.jdata], dim=1)

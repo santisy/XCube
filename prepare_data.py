@@ -10,12 +10,11 @@ import argparse
 
 args = argparse.ArgumentParser()
 args.add_argument('--data_root', type=str, default='../data/shapenet_manifold')
-args.add_argument('--target_root', type=str, default='../data/shapenet/')
 args.add_argument('--num_vox', type=int, default=512)
 args = args.parse_args()
 
 data_root = args.data_root
-target_root = args.target_root
+target_root = data_root
 
 num_vox = args.num_vox
 
@@ -33,7 +32,7 @@ os.makedirs(target_dir, exist_ok=True)
 model_list = glob.glob(os.path.join(data_root, "*.obj"))
 
 for model_path in tqdm(model_list):
-    model_name = os.path.basename(model_list).split(".")[0]
+    model_name = os.path.basename(model_path).split(".")[0]
     target_path = os.path.join(target_dir, f"{model_name}.pkl")
     # check if target_path exist
     if os.path.exists(target_path):

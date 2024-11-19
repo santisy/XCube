@@ -13,6 +13,9 @@ from pathlib import Path
 from datetime import datetime
 import trimesh
 
+import sys
+sys.path.insert(0, ".")
+
 from xcube.utils.vis_util import random_seed
 from xcube.utils import exp
 

@@ -6,6 +6,7 @@ import yaml
 
 import torch
 from easydict import EasyDict as edict
+from omegaconf import OmegaConf 
 from pathlib import Path
 from tqdm import tqdm
 
@@ -27,14 +28,13 @@ def create_model_from_args(config_path, ckpt_path, strict=True):
 parser = argparse.ArgumentParser()
 parser.add_argument("--ckpt", required=True, type=str)
 parser.add_argument("--input_dir", required=True, type=str)
-parser.add_argument("--output_dir", required=True, type=str)
 parser.add_argument("--class_label", required=True, type=str)
 
 args = parser.parse_args()
 
 # Prepare directories
 input_dir = args.input_dir
-output_dir = args.output_dir
+output_dir = os.path.join("recon_out", os.path.basename(input_dir))
 os.makedirs(output_dir, exist_ok=True)
 
 if args.class_label == "chair":
@@ -52,15 +52,15 @@ reconstructor = create_model_from_args(config_nksr, ckpt_nksr, strict=False).cud
 
 input_files = glob.glob(os.path.join(input_dir, "*.pkl"))
 
-with open('configs/train/vae/vae_128x128x128_sparse.yaml', 'r') as file:
-    hparams = edict(yaml.safe_load(file))
+hparams = OmegaConf.load("configs/train/vae/vae_128x128x128_sparse.yaml")
 if args.class_label == "objaverse":
-    with open('configs/objaverse/train_vae_128x128x128_sparse.yaml', 'r') as file:
-        hparams_v2 = edict(yaml.safe_load(file))
-    hparams.update(hparams_v2)
+    hparams_v2 = OmegaConf.load("configs/objaverse/train_vae_128x128x128_sparse.yaml")
+    hparams = OmegaConf.merge(hparams, hparams_v2)
 
 hparams.pretrained_weight = args.ckpt
 vae = VAE(hparams).cuda()
+vae = vae.eval()
+device = torch.device("cuda")
 
 # Data preparation
 for data_path in tqdm(input_files):
@@ -68,11 +68,12 @@ for data_path in tqdm(input_files):
     input_data = torch.load(data_path)
 
     data_dict = {}
-    data_dict[DS.INPUT_PC] = [input_data['points'],]
-    data_dict[DS.TARGET_NORMAL] = [input_data['normals'],]
+    data_dict[DS.TARGET_NORMAL] = input_data['normals'].to(device)
+    data_dict[DS.INPUT_PC] = input_data['points'].to(device)
 
-    out_dict = edict()
-    vae(data_dict, out_dict)
+    out_dict = {}
+    with torch.no_grad():
+        vae(data_dict, out_dict)
 
     output_x = out_dict['x']
     res = out_dict
@@ -80,13 +81,14 @@ for data_path in tqdm(input_files):
     # Export the mesh
     batch_idx = 0
     pd_grid = output_x.grid[batch_idx]
-    pd_normal = res.normal_features[-1].feature[batch_idx].jdata
+    pd_normal = res["normal_features"][-1].feature[batch_idx].jdata
     with torch.no_grad():
         field = reconstructor.forward({'in_grid': pd_grid, 'in_normal': pd_normal})
-    field = field['kernel_sdf']
+    field = field['neural_udf']
     mesh = field.extract_dual_mesh(max_depth=0, grid_upsample=2)
     # save mesh
-    mesh_save = trimesh.Trimesh(vertices=mesh.v.cpu().numpy(), faces=mesh.f.cpu().numpy())
+    mesh_save = trimesh.Trimesh(vertices=mesh.v.detach().cpu().numpy(),
+                                faces=mesh.f.detach().cpu().numpy())
     # mesh_save.merge_vertices()
     mesh_save.export(os.path.join(output_dir, f"{data_name}_XCubeRecon.obj"))
 

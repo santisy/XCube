@@ -134,6 +134,7 @@ class Model(BaseModel):
             out.update({
                 'color_features': unet_res.color_features,
             })
+        out.update({'x': unet_output})
         return out
 
     def on_validation_epoch_start(self):
