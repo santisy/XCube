@@ -84,8 +84,11 @@ for data_path in tqdm(input_files):
     pd_normal = res["normal_features"][-1].feature[batch_idx].jdata
     with torch.no_grad():
         field = reconstructor.forward({'in_grid': pd_grid, 'in_normal': pd_normal})
+
+    #field = field['kernel_sdf']
+    #mesh = field.extract_dual_mesh(max_depth=0, grid_upsample=2)
     field = field['neural_udf']
-    mesh = field.extract_dual_mesh(max_depth=0, grid_upsample=2)
+    mesh = field.extract_dual_mesh(grid_upsample=2)
     # save mesh
     mesh_save = trimesh.Trimesh(vertices=mesh.v.detach().cpu().numpy(),
                                 faces=mesh.f.detach().cpu().numpy())
